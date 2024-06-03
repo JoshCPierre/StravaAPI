@@ -1,6 +1,9 @@
 {
   "cSpell.words": [
     "dotenv",
-    "polyline"
+    "pandasql",
+    "pdsql",
+    "polyline",
+    "sqldf"
   ]
 }
