@@ -54,27 +54,64 @@ all_activities = activities_response.json()
 
 # mysql must be installed on computer
 
+existing_database = None
+
+while existing_database not in {'1','2'}:
+  existing_database = input("Do you have an existing database:\ntype 1 for yes\n"
+    "type 2 for no\n"
+    "> ")
+  if existing_database not in {'1','2'}:
+        print("Please enter 1 or 2")
+
+db_name = None
 sql_password = os.getenv('SQL_PASSWORD')
-my_database = mysql.connector.connect(
-  host="localhost",
-  user="root",
+
+if (existing_database == 2):
+  db_name = input("What would you like to name your database: ")
+  my_database = mysql.connector.connect(
+  host='localhost',
+  user='root',
   passwd=sql_password
-)
+  )
+  
+  my_cursor = my_database.cursor()
+  my_cursor.execute(f"CREATE DATABASE {db_name}")
 
-print(my_database)
+else: #just establish name
+  db_name = input("What is the name of your database: ")
+
+
+my_database = mysql.connector.connect(
+  host='localhost',
+  user='root',
+  passwd=sql_password,
+  database=db_name
+  )
+
 my_cursor = my_database.cursor()
-
-
-# my_cursor.execute("SQL COMMAND")
-
+   
 
 
 
+# my_cursor.execute("CREATE TABLE ")
 
 
 
 
-for i in range(len(all_activities)) :
+user_choice_of_activity = None
+while (user_choice_of_activity not in {'1','2','3'}):
+  user_choice_of_activity = input(
+      "What activity data would you like to access:\n"
+      "type 1 for all activities\n"
+      "type 2 for running\n"
+      "type 3 for walking\n"
+      "> "
+  )
+  if user_choice_of_activity not in {'1','2','3'}:
+    print("Please enter 1, 2, 3")
+
+
+for i in range(len(all_activities)):
   activity_id = all_activities[i]['id']
   # get request gets extra information of activity if you give it its id
   get_all_activity_data_url = f"https://www.strava.com/api/v3/activities/{activity_id}"
@@ -83,7 +120,8 @@ for i in range(len(all_activities)) :
 
   # get a map of your activity
   # https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
-  coordinates = polyline.decode(activity['map']['summary_polyline'])
+  summary_polyline = activity['map']['summary_polyline']
+  # print(summary_polyline, "\n")
   print(activity, "\n")
 
 
@@ -97,6 +135,7 @@ for i in range(len(all_activities)) :
 # print(streams[0]['data'])
 
 
+my_cursor.close()
 
 
 
