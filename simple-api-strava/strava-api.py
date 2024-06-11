@@ -43,17 +43,9 @@ access_token_request = requests.post(auth_code_url, data=data, verify=False)
 
 # get access token from post request json
 access_token = access_token_request.json()['access_token']
-header = {'Authorization': f'Bearer {access_token}'}
-
-
-# get all activities and their stats
-all_activities_url = "https://www.strava.com/api/v3/athlete/activities"
-activities_response = requests.get(all_activities_url, headers=header)
-all_activities = activities_response.json()
 
 
 # mysql must be installed on computer
-
 existing_database = None
 
 while existing_database not in {'1','2'}:
@@ -66,7 +58,7 @@ while existing_database not in {'1','2'}:
 db_name = None
 sql_password = os.getenv('SQL_PASSWORD')
 
-if (existing_database == 2):
+if (existing_database == '2'): # create new database
   db_name = input("What would you like to name your database: ")
   my_database = mysql.connector.connect(
   host='localhost',
@@ -76,8 +68,7 @@ if (existing_database == 2):
   
   my_cursor = my_database.cursor()
   my_cursor.execute(f"CREATE DATABASE {db_name}")
-
-else: #just establish name
+else: 
   db_name = input("What is the name of your database: ")
 
 
@@ -90,10 +81,26 @@ my_database = mysql.connector.connect(
 
 my_cursor = my_database.cursor()
    
+table_query = """
+    CREATE TABLE IF NOT EXISTS user_data (
+        activity_id BIGINT,
+        type VARCHAR(20),
+        distance INT,
+        elapsed_time INT,
+        average_cadence DECIMAL(3,1),
+        average_watts DECIMAL(4,1),
+        max_watts INT,
+        calories SMALLINT,
+        average_speed DECIMAL(4,2),
+        max_speed DECIMAL(4,2),
+        average_heartrate DECIMAL(4,1),
+        max_heartrate SMALLINT,
+        summary_polyline VARCHAR(1500),
+        PRIMARY KEY(activity_id)
+    )
+"""
+my_cursor.execute(table_query)
 
-
-
-# my_cursor.execute("CREATE TABLE ")
 
 
 
@@ -108,23 +115,60 @@ while (user_choice_of_activity not in {'1','2','3'}):
       "> "
   )
   if user_choice_of_activity not in {'1','2','3'}:
-    print("Please enter 1, 2, 3")
+    print("Please enter 1, 2, or 3")
 
 
-for i in range(len(all_activities)):
-  activity_id = all_activities[i]['id']
-  # get request gets extra information of activity if you give it its id
-  get_all_activity_data_url = f"https://www.strava.com/api/v3/activities/{activity_id}"
-  get_all_activity_data_response = requests.get(get_all_activity_data_url, headers=header)
-  activity = get_all_activity_data_response.json()
-
-  # get a map of your activity
-  # https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
-  summary_polyline = activity['map']['summary_polyline']
-  # print(summary_polyline, "\n")
-  print(activity, "\n")
+header = {'Authorization': f'Bearer {access_token}'}
+# get all activities and their stats
+all_activities_url = "https://www.strava.com/api/v3/athlete/activities"
 
 
+
+# ensure you can access all activities and not api request limit
+page_num = 1
+while True:
+  param = {'per_page': 100, 'page': page_num}
+  activities_response = requests.get(all_activities_url, headers=header, params=param)
+  all_activities = activities_response.json()
+
+  if (len(all_activities) == 0):
+    break
+
+  # each individual activity in all of them
+  for activity_data in all_activities:
+    activity_id = activity_data['id']
+  
+    # get request gets extra information of activity by giving its id
+    get_all_activity_data_url = f"https://www.strava.com/api/v3/activities/{activity_id}"
+    get_all_activity_data_response = requests.get(get_all_activity_data_url, headers=header)
+    activity = get_all_activity_data_response.json()
+
+    # set to default value if there is a key error
+    values = (
+    activity_id,
+    activity.get('type', 'N/A'),
+    activity.get('distance', 0),
+    activity.get('elapsed_time', 0),
+    activity.get('average_cadence', 0),
+    activity.get('average_watts', 0),
+    activity.get('max_watts', 0),
+    activity.get('calories', 0),
+    activity.get('average_speed', 0),
+    activity.get('max_speed', 0),
+    activity.get('average_heartrate', 0),
+    activity.get('max_heartrate', 0),
+    activity.get('map', {}).get('summary_polyline', '')
+)
+
+    query = "INSERT INTO user_data (activity_id, type, distance, elapsed_time, average_cadence, average_watts, max_watts, calories, average_speed, max_speed, average_heartrate, max_heartrate, summary_polyline) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+
+    my_cursor.execute(query, values)
+  
+
+  page_num += 1
+
+
+  
 
 
 
@@ -134,7 +178,7 @@ for i in range(len(all_activities)):
 # streams = streams_response.json()
 # print(streams[0]['data'])
 
-
+my_database.commit()
 my_cursor.close()
 
 
@@ -163,14 +207,5 @@ athlete_zones_response = requests.get(athlete_zones_url, headers=header)
 athlete_zones = athlete_zones_response.json()
 # print(athlete_zones)
 
-
-
-# df = pd.DataFrame.from_records(all_activities)
-# df = df[["id", "type", "distance", "elapsed_time", "average_cadence", "average_watts", "max_watts",
-# "calories", "average_speed", "max_speed", ]]
-# if (has_heartrate) {"average_heartrate", "max_heartrate"}
-
-
-# sql_query = "SELECT * FROM df WHERE distance <> 0.0"
-# df = pdsql.sqldf(sql_query, locals())
-# print(df)
+# references
+# https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
