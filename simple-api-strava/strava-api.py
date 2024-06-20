@@ -6,7 +6,6 @@ import pandas as pd
 import mysql.connector
 import matplotlib.pyplot as plt
 import numpy as np
-import polyline
 import csv
 
 load_dotenv()
@@ -44,7 +43,6 @@ access_token_request = requests.post(auth_code_url, data=data, verify=False)
 # get access token from post request json
 access_token = access_token_request.json()['access_token']
 
-
 # mysql must be installed on computer
 existing_database = None
 
@@ -55,10 +53,11 @@ while existing_database not in {'1','2'}:
   if existing_database not in {'1','2'}:
         print("Please enter 1 or 2")
 
+
 db_name = None
 sql_password = os.getenv('SQL_PASSWORD')
-
-if (existing_database == '2'): # create new database
+if (existing_database == '2'): 
+  # create new database
   db_name = input("What would you like to name your database: ")
   my_database = mysql.connector.connect(
   host='localhost',
@@ -68,9 +67,24 @@ if (existing_database == '2'): # create new database
   
   my_cursor = my_database.cursor()
   my_cursor.execute(f"CREATE DATABASE {db_name}")
+  print(f"Database '{db_name}' created successfully.")
 else: 
   db_name = input("What is the name of your database: ")
 
+unit_conversion = None
+
+while unit_conversion not in {'1','2'}:
+  unit_conversion = input("What unit would you like to use for distance?:\ntype 1 for meters\n"
+    "type 2 for miles\n"
+    "> ")
+  if unit_conversion not in {'1','2'}:
+        print("Please enter 1 or 2")
+
+speed_conversion = 1
+distance_conversion = 1
+if (unit_conversion == 2):
+  speed_conversion = 2.236936
+  distance_conversion = 0.0006213712
 
 my_database = mysql.connector.connect(
   host='localhost',
@@ -84,15 +98,16 @@ my_cursor = my_database.cursor()
 table_query = """
     CREATE TABLE IF NOT EXISTS user_data (
         activity_id BIGINT,
+        start_date VARCHAR(10),
         type VARCHAR(20),
-        distance INT,
-        elapsed_time INT,
+        distance_m INT,
+        elapsed_time_s INT,
         average_cadence DECIMAL(3,1),
         average_watts DECIMAL(4,1),
         max_watts INT,
         calories SMALLINT,
-        average_speed DECIMAL(4,2),
-        max_speed DECIMAL(4,2),
+        average_speed_mps DECIMAL(4,2),
+        max_speed_mps DECIMAL(4,2),
         average_heartrate DECIMAL(4,1),
         max_heartrate SMALLINT,
         summary_polyline VARCHAR(1500),
@@ -101,29 +116,11 @@ table_query = """
 """
 my_cursor.execute(table_query)
 
-
-
-
-
-user_choice_of_activity = None
-while (user_choice_of_activity not in {'1','2','3'}):
-  user_choice_of_activity = input(
-      "What activity data would you like to access:\n"
-      "type 1 for all activities\n"
-      "type 2 for running\n"
-      "type 3 for walking\n"
-      "> "
-  )
-  if user_choice_of_activity not in {'1','2','3'}:
-    print("Please enter 1, 2, or 3")
-
-
 header = {'Authorization': f'Bearer {access_token}'}
 # get all activities and their stats
 all_activities_url = "https://www.strava.com/api/v3/athlete/activities"
 
-
-
+print("INSERTING VALUES...")
 # ensure you can access all activities and not api request limit
 page_num = 1
 while True:
@@ -146,66 +143,66 @@ while True:
     # set to default value if there is a key error
     values = (
     activity_id,
+    activity.get('start_date', '0000-00-00'),
     activity.get('type', 'N/A'),
-    activity.get('distance', 0),
+    activity.get('distance', 0) * distance_conversion,
     activity.get('elapsed_time', 0),
     activity.get('average_cadence', 0),
     activity.get('average_watts', 0),
     activity.get('max_watts', 0),
     activity.get('calories', 0),
-    activity.get('average_speed', 0),
-    activity.get('max_speed', 0),
+    activity.get('average_speed', 0) * speed_conversion,
+    activity.get('max_speed', 0) * speed_conversion,
     activity.get('average_heartrate', 0),
     activity.get('max_heartrate', 0),
     activity.get('map', {}).get('summary_polyline', '')
-)
+    )
 
-    query = "INSERT INTO user_data (activity_id, type, distance, elapsed_time, average_cadence, average_watts, max_watts, calories, average_speed, max_speed, average_heartrate, max_heartrate, summary_polyline) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    query = "INSERT IGNORE INTO user_data (activity_id, start_date, type, distance_m, elapsed_time_s, average_cadence, average_watts, max_watts, calories, average_speed_mps, max_speed_mps, average_heartrate, max_heartrate, summary_polyline) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
     my_cursor.execute(query, values)
   
-
   page_num += 1
 
+# alter unit of measurements to user preference if need to be changed
+if (unit_conversion == 2):
+  my_cursor.execute("ALTER TABLE user_data RENAME COLUMN distance_m to distance_miles")
+  my_cursor.execute("ALTER TABLE user_data RENAME COLUMN average_speed_mps to average_speed_mph")
+  my_cursor.execute("ALTER TABLE user_date RENAME COLUMN max_speed_mps to max_speed_mph")
 
+print("VALUES INSERTED")
+
+# my_cursor.execute("SELECT distance FROM user_data ")  
+# for one_activity in my_cursor:
+#   # returns a tuple so only want to collect first value
+#   one_activity[0]
   
+# input which of these values to plot do execute with input 
+# only plot last 50 or so?
 
 
+user_choice_of_activity = None
+while (user_choice_of_activity not in {'1','2','3'}):
+  user_choice_of_activity = input(
+      "What activity data would you like to access:\n"
+      "type 1 for all activities\n"
+      "type 2 for running\n"
+      "type 3 for walking\n"
+      "> "
+  )
+  if user_choice_of_activity not in {'1','2','3'}:
+    print("Please enter 1, 2, or 3")
 
-# scope=activity:read_all
-# streams_url = f"https://www.strava.com/api/v3/activities/{first_activity_id}/streams"
-# streams_response = requests.get(streams_url, headers=header)
-# streams = streams_response.json()
-# print(streams[0]['data'])
+
 
 my_database.commit()
 my_cursor.close()
 
 
+# # references
+# # https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
 
-
-# set refresh token to one with scope=profile:read_all
-data = {
-  'client_id': client_id,
-  'client_secret': client_secret,
-  'refresh_token': profile_refresh_token,
-  'grant_type': "refresh_token",
-  'f': 'json'
-}
-
-auth_code_url = "https://www.strava.com/api/v3/oauth/token"
-access_token_request = requests.post(auth_code_url, data=data, verify=False)
-
-# get new access token from post request
-access_token = access_token_request.json()['access_token']
-
-
-header = {'Authorization': f'Bearer {access_token}'}
-
-athlete_zones_url = "https://www.strava.com/api/v3/athlete/zones"
-athlete_zones_response = requests.get(athlete_zones_url, headers=header)
-athlete_zones = athlete_zones_response.json()
-# print(athlete_zones)
-
-# references
-# https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
+#  # heartrate zones request
+#     get_heartrate_zones_url = f"https://www.strava.com/api/v3/activities/{activity_id}/streams"
+#     get_heartrate_zones_response = requests.get(get_heartrate_zones_url, headers=header)
+#     heartrate_zones = get_heartrate_zones_response.json()
