@@ -82,7 +82,7 @@ while unit_conversion not in {'1','2'}:
 
 speed_conversion = 1
 distance_conversion = 1
-if (unit_conversion == 2):
+if (unit_conversion == '2'):
   speed_conversion = 2.236936
   distance_conversion = 0.0006213712
 
@@ -165,12 +165,15 @@ while True:
   page_num += 1
 
 # alter unit of measurements to user preference if need to be changed
-if (unit_conversion == 2):
+if (unit_conversion == '2'):
   my_cursor.execute("ALTER TABLE user_data RENAME COLUMN distance_m to distance_miles")
   my_cursor.execute("ALTER TABLE user_data RENAME COLUMN average_speed_mps to average_speed_mph")
   my_cursor.execute("ALTER TABLE user_date RENAME COLUMN max_speed_mps to max_speed_mph")
+  print("unit conversion occurred")
 
 print("VALUES INSERTED")
+print(distance_conversion)
+print(speed_conversion)
 
 # my_cursor.execute("SELECT distance FROM user_data ")  
 # for one_activity in my_cursor:
@@ -195,8 +198,20 @@ while (user_choice_of_activity not in {'1','2','3'}):
 
 
 
+if user_choice_of_activity == '2':
+  my_cursor.execute("SELECT * FROM user_data WHERE type=%s LIMIT 50", ('run',))
+elif user_choice_of_activity == '3':
+  my_cursor.execute("SELECT * FROM user_data WHERE type=%s LIMIT 50", ('walk',))
+else:
+  my_cursor.execute("SELECT * FROM user_data LIMIT 50")
+
+
+# write to csv, plot data
+
 my_database.commit()
 my_cursor.close()
+
+
 
 
 # # references
