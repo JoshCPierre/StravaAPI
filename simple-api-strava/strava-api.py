@@ -100,7 +100,7 @@ table_query = """
         activity_id BIGINT,
         start_date VARCHAR(10),
         type VARCHAR(20),
-        distance_m INT,
+        distance_m DECIMAL(4,2),
         elapsed_time_s INT,
         average_cadence DECIMAL(3,1),
         average_watts DECIMAL(4,1),
@@ -168,20 +168,19 @@ while True:
 if (unit_conversion == '2'):
   my_cursor.execute("ALTER TABLE user_data RENAME COLUMN distance_m to distance_miles")
   my_cursor.execute("ALTER TABLE user_data RENAME COLUMN average_speed_mps to average_speed_mph")
-  my_cursor.execute("ALTER TABLE user_date RENAME COLUMN max_speed_mps to max_speed_mph")
+  my_cursor.execute("ALTER TABLE user_data RENAME COLUMN max_speed_mps to max_speed_mph")
   print("unit conversion occurred")
 
 print("VALUES INSERTED")
-print(distance_conversion)
-print(speed_conversion)
 
 # my_cursor.execute("SELECT distance FROM user_data ")  
 # for one_activity in my_cursor:
 #   # returns a tuple so only want to collect first value
 #   one_activity[0]
   
-# input which of these values to plot do execute with input 
-# only plot last 50 or so?
+
+my_cursor.fetchall()
+my_database.commit()
 
 
 user_choice_of_activity = None
@@ -196,19 +195,38 @@ while (user_choice_of_activity not in {'1','2','3'}):
   if user_choice_of_activity not in {'1','2','3'}:
     print("Please enter 1, 2, or 3")
 
-
-
 if user_choice_of_activity == '2':
-  my_cursor.execute("SELECT * FROM user_data WHERE type=%s LIMIT 50", ('run',))
+  my_cursor.execute("SELECT * FROM user_data WHERE type=%s LIMIT 50", ('Run',))
+  print("RUN SELECTED")
+
 elif user_choice_of_activity == '3':
-  my_cursor.execute("SELECT * FROM user_data WHERE type=%s LIMIT 50", ('walk',))
+  my_cursor.execute("SELECT * FROM user_data WHERE type=%s LIMIT 50", ('Walk',))
+  print("WALK SELECTED")
+
 else:
   my_cursor.execute("SELECT * FROM user_data LIMIT 50")
+  print("ALL ACTIVITIES SELECTED")
 
-
-# write to csv, plot data
-
+result = my_cursor.fetchall()
 my_database.commit()
+
+for row in result:
+  print(row)
+
+file = "data.csv"
+
+
+
+with open(file, 'w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerows(result)
+
+new_file = pd.read_csv(file)
+
+
+# plot data
+
+my_database.close()
 my_cursor.close()
 
 
