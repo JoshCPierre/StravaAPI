@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 
+METERS_TO_MILES = 0.0006213712
+METERS_PER_SECOND_TO_MPH = 2.236936
+
 load_dotenv()
 
 client_id = os.getenv('CLIENT_ID')
@@ -83,8 +86,8 @@ while unit_conversion not in {'1','2'}:
 speed_conversion = 1
 distance_conversion = 1
 if (unit_conversion == '2'):
-  speed_conversion = 2.236936
-  distance_conversion = 0.0006213712
+  speed_conversion = METERS_PER_SECOND_TO_MPH
+  distance_conversion = METERS_TO_MILES
 
 my_database = mysql.connector.connect(
   host='localhost',
@@ -210,34 +213,81 @@ else:
 result = my_cursor.fetchall()
 my_database.commit()
 
-for row in result:
-  print(row)
+# print csv file
+# for row in result:
+#   print(row)
 
+# write to csv file
 file = "data.csv"
-
-
 
 with open(file, 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerows(result)
 
 
-# https://www.geeksforgeeks.org/how-to-add-a-header-to-a-csv-file-in-python/
+
+# add header to csv file
 new_file = pd.read_csv(file)
 
+header_csv = ['activity_id', 'start_date', 'type', 'distance_m', 'elapsed_time_s', 'average_cadence', 'average_watts', 'max_watts', 'calories', 'average_speed_mps', 'max_speed_mps', 'average_heartrate', 'max_heartrate', 'summary_polyline']
 
-# plot data
+if (unit_conversion == '2'):
+  header_csv[3] = 'distance_miles'
+  header_csv[9] = 'average_speed_mph'
+  header_csv[10] = 'max_speed_mph'
+
+new_file.to_csv(file, header=header_csv, index=False)
+
+# add distances and time to lists
+
+distance_list = []
+time_list = []
+
+if (unit_conversion == '1'):
+  my_cursor.execute("SELECT distance_m FROM user_data")
+else:
+  my_cursor.execute("SELECT distance_miles FROM user_data")
+
+sql_result = my_cursor.fetchall()
+
+for distance in sql_result:
+  distance_list.append(distance[0])
+
+my_database.commit()
+
+my_cursor.execute("SELECT elapsed_time_s FROM user_data")
+
+sql_result = my_cursor.fetchall()
+
+for elapsed_time in sql_result:
+  time_list.append(elapsed_time[0])
+
+# plot 
+colors = np.random.uniform(15, 80, len(distance_list))
+fig, ax = plt.subplots()
+ax.scatter(distance_list, time_list, s=20, c=colors, vmin=0, vmax=100)
+
+ax.set_xlim(min(distance_list), max(distance_list))
+ax.set_ylim(min(time_list), max(time_list))
+ax.set_xticks(np.arange(min(distance_list), max(distance_list) + 1))
+ax.set_yticks(np.arange(min(time_list), max(time_list) + 1))
+
+plt.title("Distance-time")
+if (unit_conversion == '1'):
+  plt.xlabel("Distance(meters)")
+else:
+  plt.xlabel("Distance(miles)")
+plt.ylabel("Time(seconds)")
+
+plt.show()
 
 my_database.close()
 my_cursor.close()
 
+# references
+# https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
 
-
-
-# # references
-# # https://nddoornekamp.medium.com/plotting-strava-data-with-python-7aaf0cf0a9c3
-
-#  # heartrate zones request
+ # heartrate zones request
 #     get_heartrate_zones_url = f"https://www.strava.com/api/v3/activities/{activity_id}/streams"
 #     get_heartrate_zones_response = requests.get(get_heartrate_zones_url, headers=header)
 #     heartrate_zones = get_heartrate_zones_response.json()
